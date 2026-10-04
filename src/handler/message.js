@@ -645,7 +645,8 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┣ 🎬 \`.bokep\` — video dewasa\n` +
 						`┣ 👘🔞 \`.cosplay18\` — cosplay 18+\n` +
 						`┣ 🔍 \`.nekopoi\` — cari judul\n` +
-						`┗ 📖 \`.manhwa\` — komik sub Indo\n\n` +
+						`┗ 📖 \`.manhwa\` — komik sub Indo\n` +
+						`┗ 📖 \`.manhua\` — komik China 18+\n\n` +
 						`┏━ 🎨 *STIKER*\n` +
 						`┣ ✨ \`.s\` — bikin stiker\n` +
 						`┣ 🗂️ \`.spack\` — Sticker.ly\n` +
@@ -925,11 +926,16 @@ export default async function ({ message, type: messagesType }, hisoka) {
 
 			case 'manhwa':
 			case 'mh':
+			case 'manhua':
 				{
+					const isManhua = m.command === 'manhua';
 					const raw = (query || '').trim();
 					const sender = m.sender || m.from;
-					const { searchManhwa, getIdChapters, getChapterPages, downloadPage } =
+					const { searchManhwa, searchManhua, getIdChapters, getChapterPages, downloadPage } =
 						await import('../helper/mangadex.js');
+					const doSearch = isManhua ? searchManhua : searchManhwa;
+					const cmdName = isManhua ? 'manhua' : 'manhwa';
+					const flag = isManhua ? '🇨🇳' : '🇰🇷';
 
 					// .manhwa baca <nomor> <chapter>
 					const bacaMatch = raw.match(/^baca\s+(\d+)\s+([\d.]+)/i);
@@ -1021,9 +1027,13 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						break;
 					}
 
-					// .manhwa <keyword> / .manhwa top / .manhwa random -> cari
+					// .manhwa/.manhua <keyword> / top / random -> cari
 					if (!raw) {
-						await m.reply('📖 Manhwa 18+ Korea sub Indo:\n`.manhwa top` — paling populer\n`.manhwa random` — acak\n`.manhwa <keyword>` — cari judul\n`.manhwa <nomor>` — daftar chapter\n`.manhwa baca <nomor> <chapter>` — baca');
+						if (isManhua) {
+							await m.reply('📖 Manhua 18+ China 🇨🇉 couple/romance sub Indo:\n`.manhua <keyword>` — cari judul\n`.manhua <nomor>` — daftar chapter\n`.manhua baca <nomor> <chapter>` — baca');
+						} else {
+							await m.reply('📖 Manhwa 18+ Korea sub Indo:\n`.manhwa top` — paling populer\n`.manhwa random` — acak\n`.manhwa <keyword>` — cari judul\n`.manhwa <nomor>` — daftar chapter\n`.manhwa baca <nomor> <chapter>` — baca');
+						}
 						break;
 					}
 					const isTop = /^top$/i.test(raw);
@@ -1065,7 +1075,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						}
 						if (!results.length) {
 							// fallback: live search + validasi chapter ID
-							const live = await searchManhwa(raw, 10);
+							const live = await doSearch(raw, 10);
 							if (!live.length) {
 								await m.reply('❌ Tidak ketemu. Coba keyword lain.');
 								break;
@@ -1086,7 +1096,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						}
 						manhwaSearchCache.set(sender, results);
 						const list = results.map((r, i) => `${i + 1}. *${r.title}*\n   └ ${r.chCount} chapter 🇮🇩`).join('\n');
-						await m.reply(`📖 Hasil *${raw}*:\n${list}\n\n_Lihat chapter: .manhwa <nomor>_`);
+						await m.reply(`📖 ${flag} Hasil *${raw}*:\n${list}\n\n_Lihat chapter: .${cmdName} <nomor>_`);
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
 					}
