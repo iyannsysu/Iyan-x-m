@@ -57,23 +57,29 @@ async function viaTikwm(rawUrl) {
 }
 
 /**
- * API key eksternal (opsional). Format respons disesuaikan per provider.
- * Saat ini sebagai slot — isi TIKTOK_V2_API_KEY + TIKTOK_V2_API di .env.
+ * API key eksternal via iyanapi.vercel.app.
+ * Format: GET {api}?url=...&apikey=...
+ * Respons: {status, result: {title, author:{nickname,unique_id}, play, wmplay, music, cover}}
  */
 async function viaApiKey(rawUrl) {
 	const key = process.env.TIKTOK_V2_API_KEY;
 	const api = process.env.TIKTOK_V2_API;
 	if (!key || !api) throw new Error('API key belum diset.');
-	// Contoh generik: GET {api}?url=...&key=...
-	const r = await fetch(`${api}?url=${encodeURIComponent(rawUrl)}&key=${encodeURIComponent(key)}`, {
-		headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(30000),
+	const r = await fetch(`${api}?url=${encodeURIComponent(rawUrl)}&apikey=${encodeURIComponent(key)}`, {
+		headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(45000),
 	});
-	if (!r.ok) throw new Error('API v2 sibuk.');
+	if (!r.ok) throw new Error('API v2 sibuk (HTTP ' + r.status + ').');
 	const j = await r.json();
-	// Sesuaikan parsing dengan provider yang dipakai
-	const videoUrl = j.video_url || j.download_url || j.data?.play;
+	if (!j.status || !j.result) throw new Error(j.message || 'API v2 gagal mengambil video.');
+	const d = j.result;
+	const videoUrl = d.play || d.wmplay;
 	if (!videoUrl) throw new Error('API v2 tidak mengembalikan URL video.');
-	return { type: 'video', title: (j.title || '').slice(0, 200), author: j.author || 'TikTok', videoUrl, source: 'v2-apikey' };
+	return {
+		type: 'video',
+		title: (d.title || '').slice(0, 200),
+		author: d.author?.nickname || d.author?.unique_id || 'TikTok',
+		videoUrl, music: d.music || null, source: 'v2-iyanapi',
+	};
 }
 
 /**
