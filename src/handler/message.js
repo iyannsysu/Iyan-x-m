@@ -688,26 +688,46 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					// foto + menu jadi SATU pesan seperti kartu.
 					// Guard byte-length: kalau jebol, kirim terpisah (anti-hang).
 					const menuCaption =
-						`👋 Halo, *${ownerName}*! Selamat datang di *adawong* 🤖\n` +
+						`👋 Halo *${ownerName}*, selamat datang di *adawong* 🤖\n` +
 						`💭 _"${quote}"_\n\n` +
-						`┏━ 📥 *DOWNLOADER*\n` +
-						`┃ ✦ .play • .ytsearch • .sfile\n` +
-						`┃ ✦ .tt • .tiktokv2 • .pin\n` +
-						`┃ ✦ .ppcouple • .cosplay • .pixiv\n` +
-						`┗ ✦ .hentai\n\n` +
-						`┏━ 🔞 *18+ ZONE*\n` +
-						`┃ ✦ .cewe • .cewekat • .cewevid\n` +
-						`┃ ✦ .chara • .hanime • .bokep\n` +
-						`┃ ✦ .cosplay18 • .nekopoi\n` +
-						`┗ ✦ .manhwa • .manhua\n\n` +
-						`┏━ 🎨 *STIKER* ━━✦\n` +
-						`┗ ✦ .s • .spack • .tpack\n\n` +
-						`┏━ 👁️ *STATUS*\n` +
-						`┃ ✦ .sw • .swread • .swreact\n` +
-						`┃ ✦ .swreply • .swreacttext\n` +
-						`┗ ✦ .swemoji • .uptimebio\n\n` +
-						`┏━ 😂 *FUN* ━━✦\n` +
-						`┗ ✦ .khodam • .alay • .hacker\n\n` +
+						`📥 *DOWNLOADER*\n` +
+						`├ .play\n` +
+						`├ .ytsearch\n` +
+						`├ .sfile\n` +
+						`├ .tt\n` +
+						`├ .tiktokv2\n` +
+						`├ .pin\n` +
+						`├ .ppcouple\n` +
+						`├ .cosplay\n` +
+						`├ .pixiv\n` +
+						`└ .hentai\n\n` +
+						`🔞 *18+ ZONE*\n` +
+						`├ .cewe\n` +
+						`├ .cewekat\n` +
+						`├ .cewevid\n` +
+						`├ .chara\n` +
+						`├ .hanime\n` +
+						`├ .bokep\n` +
+						`├ .cosplay18\n` +
+						`├ .nekopoi\n` +
+						`├ .manhwa\n` +
+						`└ .manhua\n\n` +
+						`🎨 *STIKER*\n` +
+						`├ .s\n` +
+						`├ .spack\n` +
+						`└ .tpack\n\n` +
+						`👁️ *STATUS*\n` +
+						`├ .sw\n` +
+						`├ .swread\n` +
+						`├ .swreact\n` +
+						`├ .swreply\n` +
+						`├ .swreacttext\n` +
+						`├ .swemoji\n` +
+						`└ .uptimebio\n\n` +
+						`😂 *FUN*\n` +
+						`├ .khodam\n` +
+						`├ .alay\n` +
+						`└ .hacker\n\n` +
 						(gcLink ? `👥 *GRUP WA*\n🔗 ${gcLink}\n\n` : '') +
 						`👑 *${ownerName}* • ⚙️ readsw`;
 					// Banner via URL (GitHub raw) — lebih ringan, tanpa baca file lokal.
