@@ -500,6 +500,28 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				}
 				break;
 
+			case 'tiktokv2':
+			case 'tt2':
+				{
+					const url = (query || m.text || '').trim();
+					if (!/tiktok\.com/i.test(url)) {
+						await m.reply('Kirim link TikTok. Contoh: `.tiktokv2 https://vt.tiktok.com/xxx/`');
+						break;
+					}
+					await m.reply('⬇️ Mengunduh TikTok (v2)...');
+					try {
+						const { getTikTokV2 } = await import('../helper/tiktokv2.js');
+						const { downloadUrl } = await import('../helper/tiktok.js');
+						const info = await getTikTokV2(url);
+						const buf = await downloadUrl(info.videoUrl, 100);
+						const caption = `🎵 *${info.title}*\n👤 ${info.author}\n🔧 via ${info.source}`;
+						await hisoka.sendMessage(m.from, { video: buf, caption }, { quoted: m });
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
+					}
+				}
+				break;
+
 			case 'play':
 				{
 					const q = (query || '').trim();
@@ -632,6 +654,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┏━ 📥 *DOWNLOADER*\n` +
 						`┣ 🎵 \`.play\` — audio YT\n` +
 						`┣ 🎬 \`.tt\` — TikTok HD + foto\n` +
+						`┣ 🎬 \`.tiktokv2\` — TikTok alt\n` +
 						`┣ 📌 \`.pin\` — Pinterest\n` +
 						`┣ 💑 \`.ppcouple\` — pp couple\n` +
 						`┣ 👘 \`.cosplay\` — cosplaytele\n` +
