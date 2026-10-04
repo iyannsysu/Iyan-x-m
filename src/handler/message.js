@@ -27,6 +27,7 @@ const execFileAsync = util.promisify(execFile);
 /** Cache hasil pencarian .hanime per pengirim: sender -> Array hasil searchHanime */
 const hanimeSearchCache = new Map();
 const bokepSearchCache = new Map();
+const cosplay18SearchCache = new Map();
 const manhwaSearchCache = new Map(); // sender -> hasil search
 const manhwaChapterCache = new Map(); // sender -> { manga, chapters }
 
@@ -642,6 +643,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┣ 🎭 \`.chara\` — karakter AI\n` +
 						`┣ 📺 \`.hanime\` — video anime\n` +
 						`┣ 🎬 \`.bokep\` — video dewasa\n` +
+						`┣ 👘🔞 \`.cosplay18\` — cosplay 18+\n` +
 						`┣ 🔍 \`.nekopoi\` — cari judul\n` +
 						`┗ 📖 \`.manhwa\` — komik sub Indo\n\n` +
 						`┏━ 🎨 *STIKER*\n` +
@@ -1416,6 +1418,75 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						bokepSearchCache.set(sender, results);
 						const list = results.map((r, i) => `${i + 1}. *${r.title}*`).join('\n');
 						await m.reply(`🔞 Hasil untuk *${raw}*:\n${list}\n\n_Download: .bokep <nomor>_`);
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
+					}
+				}
+				break;
+
+			case 'cosplay18':
+			case 'cp18':
+				{
+					const raw = (query || '').trim();
+					const sender = m.sender || m.from;
+					const { searchBokep, getBokepVideo, downloadBokep } = await import('../helper/bokep.js');
+
+					// .cosplay18 <nomor> -> download dari hasil terakhir
+					if (/^\d+$/.test(raw)) {
+						const cache = cosplay18SearchCache.get(sender);
+						if (!cache || !cache.length) {
+							await m.reply('Cari dulu: `.cosplay18 <keyword>`\nContoh: `.cosplay18 mitsuri`');
+							break;
+						}
+						const idx = parseInt(raw) - 1;
+						if (idx < 0 || idx >= cache.length) {
+							await m.reply(`Nomor 1-${cache.length} aja.`);
+							break;
+						}
+						const item = cache[idx];
+						await m.reply(`🎬 Mengambil *${item.title}*...`);
+						try {
+							const { videoUrl } = await getBokepVideo(item.url);
+							await m.reply('⬇️ Mengunduh video...');
+							const data = await downloadBokep(videoUrl, 100);
+							const caption = `🔞👘 *${item.title}*`;
+							if (data.length > 64 * 1024 * 1024) {
+								await hisoka.sendMessage(m.from, { document: data, fileName: 'cosplay18.mp4', caption }, { quoted: m });
+							} else {
+								await hisoka.sendMessage(m.from, { video: data, caption }, { quoted: m });
+							}
+						} catch (err) {
+							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
+						}
+						break;
+					}
+
+					if (!raw) {
+						await m.reply(
+							'╭─「 👘🔞 *COSPLAY 18+* 」\n' +
+							'│\n' +
+							'│ Video cosplay dewasa\n' +
+							'│ (manusia asli, bukan AI).\n' +
+							'│\n' +
+							'│ *Format:*\n' +
+							'│ • `.cosplay18 <keyword>`\n' +
+							'│ • `.cosplay18 <nomor>`\n' +
+							'│\n' +
+							'│ *Contoh:*\n' +
+							'│ 1. `.cosplay18 mitsuri`\n' +
+							'│ 2. `.cosplay18 rem`\n' +
+							'│ 3. `.cosplay18 1`\n' +
+							'╰──────────────────────'
+						);
+						break;
+					}
+					const searchQuery = `cosplay ${raw}`;
+					await m.reply(`🔎 Mencari cosplay 18+ *${raw}*...`);
+					try {
+						const results = await searchBokep(searchQuery);
+						cosplay18SearchCache.set(sender, results);
+						const list = results.map((r, i) => `${i + 1}. *${r.title}*`).join('\n');
+						await m.reply(`👘🔞 Hasil untuk *${raw}*:\n${list}\n\n_Download: .cosplay18 <nomor>_`);
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
 					}
