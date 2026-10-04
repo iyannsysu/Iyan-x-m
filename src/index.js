@@ -27,6 +27,7 @@ process.on('unhandledRejection', reason => {
 
 import JSONDB from './db/json.js';
 import { injectClient } from './helper/inject.js';
+import { readSwConfig } from './helper/swconfig.js';
 import { telegram } from './helper/index.js';
 import { getCaseName } from './helper/utils.js';
 
@@ -219,6 +220,25 @@ async function main() {
 		if (connection === 'open') {
 			lastDisconnect = 0; // Reset lastDisconnect on successful connection
 			console.log(`\x1b[32mConnected successfully! ${JSON.stringify(hisoka.user, null, 2)}\x1b[39m`);
+
+			// Bio WA otomatis: tampilkan uptime bot (toggle via .uptimebio on/off)
+			if (!hisoka._uptimeBioTimer) {
+				const uptimeBioTick = async () => {
+					try {
+						const sw = readSwConfig();
+						if (!sw.uptimebio) return;
+						const s = Math.floor(process.uptime());
+						const h = Math.floor(s / 3600);
+						const mnt = Math.floor((s % 3600) / 60);
+						const up = h > 0 ? `${h}j ${mnt}m` : `${mnt}m`;
+						await hisoka.updateProfileStatus(`🟢 Iyan x m • Online ⏱️ ${up}`);
+					} catch (err) {
+						console.error('\x1b[31mGagal update bio uptime:\x1b[39m', err?.message || err);
+					}
+				};
+				uptimeBioTick();
+				hisoka._uptimeBioTimer = setInterval(uptimeBioTick, 10 * 60 * 1000);
+			}
 
 			// fetch all groups for caching
 			// console.info('\x1b[36mFetching group metadata...\x1b[39m');
