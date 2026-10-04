@@ -32,7 +32,7 @@ const manhwaSearchCache = new Map(); // sender -> hasil search
 const manhwaChapterCache = new Map(); // sender -> { manga, chapters }
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MENU_BANNER = path.join(PROJECT_ROOT, 'assets/adawong-logo.webp');
+const MENU_BANNER = path.join(PROJECT_ROOT, 'assets/menu-adawong.jpg');
 const GC_JSON = path.join(PROJECT_ROOT, 'gc.json');
 
 /** Baca link invite grup WA untuk menu (diset via .setgc). */
@@ -668,18 +668,18 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				{
 					const ownerName = process.env.BOT_OWNER_NAME || 'Iyan';
 					const quotes = [
-						'Jangan menunggu momen yang sempurna, ambil momenmu dan buat sempurna.',
-						'Kesuksesan dimulai dari keberanian untuk mencoba.',
+						'Jangan menunggu sempurna, buat momenmu sempurna.',
+						'Berani mencoba adalah awal kesuksesan.',
 						'Hari ini lelah, besok bangga.',
-						'Fokus pada proses, hasil akan mengikuti.',
-						'Mimpi tanpa aksi hanyalah angan-angan.',
-						'Sedikit kemajuan setiap hari lebih baik daripada tidak sama sekali.',
-						'Kegagalan adalah guru terbaik, asal mau belajar.',
-						'Jadilah versi terbaik dari dirimu, bukan versi orang lain.',
-						'Waktu terbaik menanam pohon adalah 20 tahun lalu. Waktu terbaik kedua adalah sekarang.',
-						'Kerja keras mengalahkan bakat saat bakat tidak bekerja keras.',
-						'Jangan takut berjalan lambat, takutlah jika hanya diam di tempat.',
-						'Semua hal besar dimulai dari langkah kecil.',
+						'Fokus proses, hasil mengikuti.',
+						'Mimpi tanpa aksi hanyalah angan.',
+						'Maju sedikit tiap hari itu cukup.',
+						'Gagal itu guru, asal mau belajar.',
+						'Jadilah versi terbaik dirimu.',
+						'Waktu terbaik mulai adalah sekarang.',
+						'Kerja keras kalahkan bakat malas.',
+						'Pelan tak apa, asal jangan diam.',
+						'Hal besar mulai dari langkah kecil.',
 					];
 					const quote = quotes[Math.floor(Math.random() * quotes.length)];
 					const gcLink = readGcLink();
@@ -689,44 +689,22 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					// Guard byte-length: kalau jebol, kirim terpisah (anti-hang).
 					const menuCaption =
 						`👋 Halo, *${ownerName}*! Selamat datang di *adawong* 🤖\n` +
-						`💭 _"${quote}_"\n\n` +
-						`┏━ 📥 *DOWNLOADER*\n` +
-						`┣ 🎵 \`.play\` — audio YT\n` +
-						`┣ 🔍 \`.ytsearch\` — cari YT\n` +
-						`┣ 📁 \`.sfile\` — cari file\n` +
-						`┣ 🎬 \`.tt\` — TikTok HD + foto\n` +
-						`┣ 🎬 \`.tiktokv2\` — TikTok alt\n` +
-						`┣ 📌 \`.pin\` — Pinterest\n` +
-						`┣ 💑 \`.ppcouple\` — pp couple\n` +
-						`┣ 👘 \`.cosplay\` — cosplaytele\n` +
-						`┣ 🎨 \`.pixiv\` — Pixiv\n` +
-						`┗ 🔞 \`.hentai\` — galeri\n\n` +
-						`┏━ 🔞 *18+ ZONE*\n` +
-						`┣ 💃 \`.cewe\` — acak\n` +
-						`┣ 📂 \`.cewekat\` — kategori\n` +
-						`┣ 🎞️ \`.cewevid\` — video\n` +
-						`┣ 🎭 \`.chara\` — karakter AI\n` +
-						`┣ 📺 \`.hanime\` — video anime\n` +
-						`┣ 🎬 \`.bokep\` — video dewasa\n` +
-						`┣ 👘🔞 \`.cosplay18\` — cosplay 18+\n` +
-						`┣ 🔍 \`.nekopoi\` — cari judul\n` +
-						`┗ 📖 \`.manhwa\` — komik sub Indo\n` +
-						`┗ 📖 \`.manhua\` — komik China 18+\n\n` +
-						`┏━ 🎨 *STIKER*\n` +
-						`┣ ✨ \`.s\` — bikin stiker\n` +
-						`┣ 🗂️ \`.spack\` — Sticker.ly\n` +
-						`┗ ✈️ \`.tpack\` — Telegram\n\n` +
-						`┏━ 👁️ *STATUS*\n` +
-						`┣ \`.sw\` — panel\n` +
-						`┣ \`.swread\`/\`.swreact\` — auto\n` +
-						`┣ \`.swreply\` — balas teks\n` +
-						`┣ \`.swreacttext\` — react tulisan\n` +
-						`┣ \`.uptimebio\` — bio uptime\n` +
-						`┗ \`.swemoji\` — emoji\n\n` +
-						`┏━ 😂 *FUN*\n` +
-						`┗ \`.khodam\` • \`.alay\` • \`.hacker\`\n\n` +
+						`💭 _"${quote}"_\n\n` +
+						`📥 *DOWNLOADER*\n` +
+						`.play • .ytsearch • .sfile • .tt • .tiktokv2\n` +
+						`.pin • .ppcouple • .cosplay • .pixiv • .hentai\n\n` +
+						`🔞 *18+ ZONE*\n` +
+						`.cewe • .cewekat • .cewevid • .chara • .hanime\n` +
+						`.bokep • .cosplay18 • .nekopoi • .manhwa • .manhua\n\n` +
+						`🎨 *STIKER*\n` +
+						`.s • .spack • .tpack\n\n` +
+						`👁️ *STATUS*\n` +
+						`.sw • .swread • .swreact • .swreply\n` +
+						`.swreacttext • .swemoji • .uptimebio\n\n` +
+						`😂 *FUN*\n` +
+						`.khodam • .alay • .hacker\n\n` +
 						(gcLink ? `👥 *GRUP WA*\n🔗 ${gcLink}\n\n` : '') +
-						`👑 *${ownerName}* • 🛠️ *${ownerName}* • ⚙️ readsw`;
+						`👑 *${ownerName}* • ⚙️ readsw`;
 					try {
 						const banner = fs.readFileSync(MENU_BANNER);
 						if (Buffer.byteLength(menuCaption, 'utf8') > 1000) {
