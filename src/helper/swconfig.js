@@ -22,6 +22,9 @@ const DEFAULTS = {
 	// Teks custom untuk REACT status (via .swreacttext). Kalau diisi, react pakai
 	// tulisan ini gantiin emoji. Kosongkan = pakai emoji seperti biasa.
 	react_text: '',
+	// Bio WA otomatis tampilkan uptime bot (via .uptimebio on/off).
+	// Kalau ON, bio diupdate tiap 10 menit: "🟢 Iyan x m • Online ⏱️ 3j 25m"
+	uptimebio: false,
 };
 
 /**
@@ -44,6 +47,7 @@ export function readSwConfig() {
 	cfg.autoreply = cfg.autoreply === true;
 	if (typeof cfg.reply_text !== 'string' || !cfg.reply_text.trim()) cfg.reply_text = 'hai';
 	if (typeof cfg.react_text !== 'string') cfg.react_text = '';
+	cfg.uptimebio = cfg.uptimebio === true;
 	// Buat file kalau belum ada / rusak, biar user bisa edit manual
 	if (!file) {
 		try {
