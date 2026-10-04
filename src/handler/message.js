@@ -841,28 +841,32 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					await m.reply(`💑 Cari pp couple *${theme}*...`);
 					try {
 						const { searchPinterest, cleanupPinterest } = await import('../helper/pinterest.js');
-						// ambil 4 biar bisa pilih 2 yang paling cocok
-						const res = await searchPinterest(`pp couple ${theme}`, 4);
-						const files = res.files.slice(0, 2);
-						if (!files.length) {
+						const { execFile: execFileAsync } = await import('child_process');
+						const { promisify } = await import('util');
+						const execFileP = promisify(execFileAsync);
+						// cari gambar couple yang lebar (cocok untuk di-split)
+						const res = await searchPinterest(`pp couple ${theme}`, 5);
+						if (!res.files.length) {
 							await m.reply('❌ Tidak ketemu. Coba tema lain.');
 							cleanupPinterest(res.tmpDir);
 							break;
 						}
+						// ambil 1 gambar, split jadi 2 (kiri-kanan) biar pasangannya cocok
+						const src = res.files[0];
+						const left = src + '_left.jpg';
+						const right = src + '_right.jpg';
+						await execFileP('ffmpeg', ['-y', '-i', src, '-vf', 'crop=iw/2:ih:0:0', left], { timeout: 30000 });
+						await execFileP('ffmpeg', ['-y', '-i', src, '-vf', 'crop=iw/2:ih:iw/2:0', right], { timeout: 30000 });
 						await hisoka.sendMessage(
 							m.from,
-							{ image: fs.readFileSync(files[0]), caption: `💑 PP Couple *${theme}*\n1️⃣ Untuk kamu` },
+							{ image: fs.readFileSync(left), caption: `💑 PP Couple *${theme}*\n👦 Untuk cowok` },
 							{ quoted: m }
 						);
-						if (files[1]) {
-							await hisoka.sendMessage(
-								m.from,
-								{ image: fs.readFileSync(files[1]), caption: `2️⃣ Untuk pasangan` }
-							);
-						}
-						if (files.length > 2 || res.files.length > 2) {
-							await m.reply(`_Mau yang lain? Ketik \`.ppcouple ${theme}\` lagi untuk acak baru_`);
-						}
+						await hisoka.sendMessage(
+							m.from,
+							{ image: fs.readFileSync(right), caption: `👧 Untuk cewek` }
+						);
+						await m.reply(`_Mau yang lain? Ketik \`.ppcouple ${theme}\` lagi_`);
 						cleanupPinterest(res.tmpDir);
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari pp couple.'));
