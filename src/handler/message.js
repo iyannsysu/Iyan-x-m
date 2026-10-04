@@ -30,28 +30,6 @@ const bokepSearchCache = new Map();
 const cosplay18SearchCache = new Map();
 const manhwaSearchCache = new Map(); // sender -> hasil search
 const manhwaChapterCache = new Map(); // sender -> { manga, chapters }
-// Pilihan tertunda universal: sender -> { type: 'bokep'|'cosplay18', results, timestamp }
-// Biar user cukup balas angka (tanpa ketik command lagi) untuk pilih hasil search.
-const pendingPick = new Map();
-
-/**
- * Download & kirim video dari hasil search bokep/cosplay18.
- * Dipakai oleh command .bokep/.cosplay18 dan balas-angka universal.
- */
-async function sendBokepVideo(hisoka, m, item, label) {
-	const { getBokepVideo, downloadBokep } = await import('../helper/bokep.js');
-	await m.reply(`🎬 Mengambil *${item.title}*...`);
-	const { videoUrl } = await getBokepVideo(item.url);
-	await m.reply('⬇️ Mengunduh video...');
-	const data = await downloadBokep(videoUrl, 100);
-	const caption = `${label} *${item.title}*`;
-	const fileName = label.includes('👘') ? 'cosplay18.mp4' : 'bokep.mp4';
-	if (data.length > 64 * 1024 * 1024) {
-		await hisoka.sendMessage(m.from, { document: data, fileName, caption }, { quoted: m });
-	} else {
-		await hisoka.sendMessage(m.from, { video: data, caption }, { quoted: m });
-	}
-}
 
 const PROJECT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MENU_BANNER = path.join(PROJECT_ROOT, 'assets/adawong-logo.webp');
@@ -372,27 +350,6 @@ export default async function ({ message, type: messagesType }, hisoka) {
 		if (!m.command && /tiktok\.com/i.test(m.text || '')) {
 			await handleTikTokDownload(hisoka, m, m.text);
 			return;
-		}
-
-		// Balas angka untuk pilih hasil search terakhir (tanpa ketik command lagi)
-		// Berlaku 5 menit setelah search .bokep / .cosplay18
-		if (!m.command && /^\d{1,2}$/.test((m.text || '').trim())) {
-			const sender = m.sender || m.from;
-			const pend = pendingPick.get(sender);
-			if (pend && Date.now() - pend.timestamp < 5 * 60 * 1000) {
-				const idx = parseInt(m.text.trim()) - 1;
-				if (idx >= 0 && idx < pend.results.length) {
-					const item = pend.results[idx];
-					pendingPick.delete(sender); // sekali pakai
-					try {
-						const label = pend.type === 'cosplay18' ? '🔞👘' : '🔞';
-						await sendBokepVideo(hisoka, m, item, label);
-					} catch (err) {
-						await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
-					}
-					return;
-				}
-			}
 		}
 
 		switch (m.command) {
@@ -1419,48 +1376,48 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				{
 					const raw = (query || '').trim();
 					const sender = m.sender || m.from;
-					const { searchBokep } = await import('../helper/bokep.js');
+					const { searchBokep, getBokepVideo, downloadBokep } = await import('../helper/bokep.js');
 
-					if (!raw) {
-						await m.reply('Kasih keyword. Contoh:\n.bokep asian\n.bokep japanese');
-						break;
-					}
-					// .bokep <nomor> -> tetap didukung (cara lama)
+					// .bokep <nomor> -> download dari hasil terakhir
 					if (/^\d+$/.test(raw)) {
-						const pend = pendingPick.get(sender);
-						const results = pend?.type === 'bokep' ? pend.results : bokepSearchCache.get(sender);
-						if (!results || !results.length) {
+						const cache = bokepSearchCache.get(sender);
+						if (!cache || !cache.length) {
 							await m.reply('Cari dulu: `.bokep <keyword>`');
 							break;
 						}
 						const idx = parseInt(raw) - 1;
-						if (idx < 0 || idx >= results.length) {
-							await m.reply(`Nomor 1-${results.length} aja.`);
+						if (idx < 0 || idx >= cache.length) {
+							await m.reply(`Nomor 1-${cache.length} aja.`);
 							break;
 						}
-						pendingPick.delete(sender);
+						const item = cache[idx];
+						await m.reply(`🎬 Mengambil *${item.title}*...`);
 						try {
-							await sendBokepVideo(hisoka, m, results[idx], '🔞');
+							const { videoUrl } = await getBokepVideo(item.url);
+							await m.reply('⬇️ Mengunduh video...');
+							const data = await downloadBokep(videoUrl, 100);
+							const caption = `🔞 *${item.title}*`;
+							if (data.length > 64 * 1024 * 1024) {
+								await hisoka.sendMessage(m.from, { document: data, fileName: 'bokep.mp4', caption }, { quoted: m });
+							} else {
+								await hisoka.sendMessage(m.from, { video: data, caption }, { quoted: m });
+							}
 						} catch (err) {
 							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
 						}
+						break;
+					}
+
+					if (!raw) {
+						await m.reply('Kasih keyword. Contoh:\n.bokep asian\n.bokep japanese');
 						break;
 					}
 					await m.reply(`🔎 Mencari *${raw}*...`);
 					try {
 						const results = await searchBokep(raw);
 						bokepSearchCache.set(sender, results);
-						pendingPick.set(sender, { type: 'bokep', results, timestamp: Date.now() });
-						// Langsung kirim hasil #1, sisanya tinggal balas angka
-						try {
-							await sendBokepVideo(hisoka, m, results[0], '🔞');
-						} catch (err) {
-							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh hasil pertama.'));
-						}
-						if (results.length > 1) {
-							const list = results.map((r, i) => `${i + 1}. *${r.title}*${i === 0 ? ' ✅' : ''}`).join('\n');
-							await m.reply(`🔞 Hasil lain untuk *${raw}*:\n${list}\n\n_Balas angka (2-${results.length}) untuk ganti video_`);
-						}
+						const list = results.map((r, i) => `${i + 1}. *${r.title}*`).join('\n');
+						await m.reply(`🔞 Hasil untuk *${raw}*:\n${list}\n\n_Download: .bokep <nomor>_`);
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
 					}
@@ -1472,7 +1429,37 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				{
 					const raw = (query || '').trim();
 					const sender = m.sender || m.from;
-					const { searchBokep } = await import('../helper/bokep.js');
+					const { searchBokep, getBokepVideo, downloadBokep } = await import('../helper/bokep.js');
+
+					// .cosplay18 <nomor> -> download dari hasil terakhir
+					if (/^\d+$/.test(raw)) {
+						const cache = cosplay18SearchCache.get(sender);
+						if (!cache || !cache.length) {
+							await m.reply('Cari dulu: `.cosplay18 <keyword>`\nContoh: `.cosplay18 mitsuri`');
+							break;
+						}
+						const idx = parseInt(raw) - 1;
+						if (idx < 0 || idx >= cache.length) {
+							await m.reply(`Nomor 1-${cache.length} aja.`);
+							break;
+						}
+						const item = cache[idx];
+						await m.reply(`🎬 Mengambil *${item.title}*...`);
+						try {
+							const { videoUrl } = await getBokepVideo(item.url);
+							await m.reply('⬇️ Mengunduh video...');
+							const data = await downloadBokep(videoUrl, 100);
+							const caption = `🔞👘 *${item.title}*`;
+							if (data.length > 64 * 1024 * 1024) {
+								await hisoka.sendMessage(m.from, { document: data, fileName: 'cosplay18.mp4', caption }, { quoted: m });
+							} else {
+								await hisoka.sendMessage(m.from, { video: data, caption }, { quoted: m });
+							}
+						} catch (err) {
+							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
+						}
+						break;
+					}
 
 					if (!raw) {
 						await m.reply(
@@ -1481,34 +1468,16 @@ export default async function ({ message, type: messagesType }, hisoka) {
 							'│ Video cosplay dewasa\n' +
 							'│ (manusia asli, bukan AI).\n' +
 							'│\n' +
-							'│ *Cara pakai:*\n' +
-							'│ Ketik `.cosplay18 mitsuri`\n' +
-							'│ langsung dikirim videonya!\n' +
+							'│ *Format:*\n' +
+							'│ • `.cosplay18 <keyword>`\n' +
+							'│ • `.cosplay18 <nomor>`\n' +
 							'│\n' +
-							'│ _Balas angka untuk ganti video_\n' +
+							'│ *Contoh:*\n' +
+							'│ 1. `.cosplay18 mitsuri`\n' +
+							'│ 2. `.cosplay18 rem`\n' +
+							'│ 3. `.cosplay18 1`\n' +
 							'╰──────────────────────'
 						);
-						break;
-					}
-					// .cosplay18 <nomor> -> tetap didukung (cara lama)
-					if (/^\d+$/.test(raw)) {
-						const pend = pendingPick.get(sender);
-						const results = pend?.type === 'cosplay18' ? pend.results : cosplay18SearchCache.get(sender);
-						if (!results || !results.length) {
-							await m.reply('Cari dulu: `.cosplay18 <keyword>`\nContoh: `.cosplay18 mitsuri`');
-							break;
-						}
-						const idx = parseInt(raw) - 1;
-						if (idx < 0 || idx >= results.length) {
-							await m.reply(`Nomor 1-${results.length} aja.`);
-							break;
-						}
-						pendingPick.delete(sender);
-						try {
-							await sendBokepVideo(hisoka, m, results[idx], '🔞👘');
-						} catch (err) {
-							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh.'));
-						}
 						break;
 					}
 					const searchQuery = `cosplay ${raw}`;
@@ -1516,17 +1485,8 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					try {
 						const results = await searchBokep(searchQuery);
 						cosplay18SearchCache.set(sender, results);
-						pendingPick.set(sender, { type: 'cosplay18', results, timestamp: Date.now() });
-						// Langsung kirim hasil #1
-						try {
-							await sendBokepVideo(hisoka, m, results[0], '🔞👘');
-						} catch (err) {
-							await m.reply('❌ ' + (err?.message || 'Gagal mengunduh hasil pertama.'));
-						}
-						if (results.length > 1) {
-							const list = results.map((r, i) => `${i + 1}. *${r.title}*${i === 0 ? ' ✅' : ''}`).join('\n');
-							await m.reply(`👘🔞 Hasil lain untuk *${raw}*:\n${list}\n\n_Balas angka (2-${results.length}) untuk ganti video_`);
-						}
+						const list = results.map((r, i) => `${i + 1}. *${r.title}*`).join('\n');
+						await m.reply(`👘🔞 Hasil untuk *${raw}*:\n${list}\n\n_Download: .cosplay18 <nomor>_`);
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
 					}
