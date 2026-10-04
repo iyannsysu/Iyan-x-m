@@ -1746,12 +1746,22 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					const input = (query || '').trim();
 					if (!input) {
 						await m.reply(
-							`🔤 React teks saat ini: "${sw.react_text || '-'}"\n\n_Pakai: .swreacttext <tulisan>_ \n_Contoh: .swreacttext hai_\n_Matikan: .swreacttext off_`
+							`🔤 React teks saat ini: "${sw.react_text || '-'}"\n\n_Pakai: .swreacttext <tulisan>_\n_Acak beberapa: .swreacttext teks1 | teks2 | teks3_\n_Matikan: .swreacttext off_`
 						);
 						break;
 					}
-					writeSwConfig({ react_text: input.slice(0, 30) });
-					await m.reply(`🔤 React status sekarang pakai tulisan: "${input.slice(0, 30)}"`);
+					// Pisahkan pakai | untuk mode acak, tiap opsi max 30 char
+					const opts = input.split('|').map(s => s.trim().slice(0, 30)).filter(Boolean);
+					if (!opts.length) {
+						await m.reply('Tulisannya kosong.');
+						break;
+					}
+					writeSwConfig({ react_text: opts.join(' | ') });
+					await m.reply(
+						opts.length > 1
+							? `🔤 React status sekarang ACAK dari ${opts.length} tulisan:\n${opts.map((o, i) => `${i + 1}. "${o}"`).join('\n')}`
+							: `🔤 React status sekarang pakai tulisan: "${opts[0]}"`
+					);
 				}
 				break;
 
