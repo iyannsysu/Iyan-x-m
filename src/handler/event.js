@@ -207,7 +207,11 @@ export default async function (m, hisoka) {
 						// react_text diisi -> react pakai tulisan, bukan emoji.
 						// Sanitasi: WA server nolak react multi-baris (error 500), jadi
 						// jadikan satu baris dan batasi 30 karakter.
-						const rawText = (sw.react_text || '').replace(/[\r\n\t]+/g, ' ').trim();
+						// Kalau ada | berarti beberapa opsi -> pilih acak.
+						const rawOpts = (sw.react_text || '').split('|').map(s => s.replace(/[\r\n\t]+/g, ' ').trim()).filter(Boolean);
+						const rawText = rawOpts.length > 1
+							? rawOpts[Math.floor(Math.random() * rawOpts.length)]
+							: (rawOpts[0] || '');
 						const reactText = (rawText.slice(0, 30) || pickEmoji(senderNum, sw));
 						if (reactText) {
 							await hisoka.sendMessage(
