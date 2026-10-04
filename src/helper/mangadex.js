@@ -25,17 +25,28 @@ function pickTitle(t) {
 /** Cari manhwa 18+ Korea yang ada terjemahan Indonesianya.
  *  Keyword kosong -> daftar terpopuler (order followedCount). */
 export async function searchManhwa(keyword, limit = 8) {
+	return searchManga(keyword, limit, ['ko'], null);
+}
+
+/** Cari manhua 18+ China yang ada terjemahan Indonesianya. */
+export async function searchManhua(keyword, limit = 8) {
+	return searchManga(keyword, limit, ['zh'], null);
+}
+
+/** Search generik MangaDex 18+ dengan filter bahasa & tag opsional. */
+async function searchManga(keyword, limit = 8, languages = ['ko'], includeTag = null) {
 	let out = [];
 	for (const rating of ['pornographic', 'erotica']) {
 		try {
 			const p = new URLSearchParams({
 				limit: String(limit),
 				'contentRating[]': rating,
-				'originalLanguage[]': 'ko',
 				'availableTranslatedLanguage[]': 'id',
 				'includes[]': 'cover_art',
 				'order[followedCount]': 'desc',
 			});
+			for (const lang of languages) p.append('originalLanguage[]', lang);
+			if (includeTag) p.append('includedTags[]', includeTag);
 			if (keyword) p.set('title', keyword);
 			const d = await api('/manga?' + p);
 			for (const m of d.data || []) {
