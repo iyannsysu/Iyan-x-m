@@ -652,6 +652,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┣ \`.swread\`/\`.swreact\` — auto\n` +
 						`┣ \`.swreply\` — balas teks\n` +
 						`┣ \`.swreacttext\` — react tulisan\n` +
+						`┣ \`.uptimebio\` — bio uptime\n` +
 						`┗ \`.swemoji\` — emoji\n\n` +
 						`┏━ 😂 *FUN*\n` +
 						`┗ \`.khodam\` • \`.alay\` • \`.hacker\`\n\n` +
@@ -1478,9 +1479,10 @@ export default async function ({ message, type: messagesType }, hisoka) {
 							`• Auto-react: ${on(sw.autoreact)}\n` +
 							`• Auto-reply: ${on(sw.autoreply)} ("${sw.reply_text}")\n` +
 							`• React teks: ${sw.react_text ? `"${sw.react_text}"` : '-'}\n` +
+							`• Bio uptime: ${on(sw.uptimebio)}\n` +
 							`• Mode acak: ${on(sw.random_emoji)}\n` +
 							`• Emoji pool (${sw.emoji_pool.length}): ${sw.emoji_pool.join(' ') || '-'}\n\n` +
-							`_Atur: .swread on/off | .swreact on/off | .swreply on/off | .swreplytext <teks> | .swreacttext <tulisan> | .swrandom on/off | .swemoji 😍🔥_`
+							`_Atur: .swread on/off | .swreact on/off | .swreply on/off | .swreplytext <teks> | .swreacttext <tulisan> | .uptimebio on/off | .swrandom on/off | .swemoji 😍🔥_`
 					);
 				}
 				break;
@@ -1564,6 +1566,37 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					}
 					const sw = writeSwConfig({ emoji_pool: emojis });
 					await m.reply(`🎲 Emoji pool diganti (${sw.emoji_pool.length}): ${sw.emoji_pool.join(' ')}`);
+				}
+				break;
+
+			case 'uptimebio':
+				{
+					const v = (query || '').trim().toLowerCase();
+					const val =
+						['on', '1', 'true', 'nyala', 'ya'].includes(v) ? true
+						: ['off', '0', 'false', 'mati', 'tidak'].includes(v) ? false
+						: null;
+					if (val === null) {
+						const sw = readSwConfig();
+						await m.reply(
+							`⏱️ Bio uptime saat ini: *${sw.uptimebio ? 'ON ✅' : 'OFF ❌'}*\n\n` +
+								`_Pakai: .uptimebio on  atau  .uptimebio off_\n` +
+								`_Kalau ON, bio WA otomatis jadi "🟢 Iyan x m • Online ⏱️ 3j 25m" (update tiap 10 menit)_`
+						);
+						break;
+					}
+					writeSwConfig({ uptimebio: val });
+					// langsung update bio saat dinyalakan
+					if (val) {
+						try {
+							const s = Math.floor(process.uptime());
+							const h = Math.floor(s / 3600);
+							const mnt = Math.floor((s % 3600) / 60);
+							const up = h > 0 ? `${h}j ${mnt}m` : `${mnt}m`;
+							await hisoka.updateProfileStatus(`🟢 Iyan x m • Online ⏱️ ${up}`);
+						} catch {}
+					}
+					await m.reply(`⏱️ Bio uptime sekarang *${val ? 'ON ✅' : 'OFF ❌'}*`);
 				}
 				break;
 
