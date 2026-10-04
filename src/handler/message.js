@@ -1581,7 +1581,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						await m.reply(
 							`⏱️ Bio uptime saat ini: *${sw.uptimebio ? 'ON ✅' : 'OFF ❌'}*\n\n` +
 								`_Pakai: .uptimebio on  atau  .uptimebio off_\n` +
-								`_Kalau ON, bio WA otomatis jadi "🟢 Iyan x m • Online ⏱️ 3j 25m" (update tiap 10 menit)_`
+								`_Kalau ON, bio WA otomatis jadi "🟢 Iyan x m • Online ⏱️ 3j 25m" (update tiap 1 menit)_`
 						);
 						break;
 					}
