@@ -522,6 +522,45 @@ export default async function ({ message, type: messagesType }, hisoka) {
 				}
 				break;
 
+			case 'sfile':
+				{
+					const q = (query || '').trim();
+					if (!q) {
+						await m.reply('Cari file di sfile. Contoh: `.sfile minecraft mod`');
+						break;
+					}
+					await m.reply('🔍 Mencari di sfile...');
+					try {
+						const { searchSfile } = await import('../helper/iyansearch.js');
+						const files = await searchSfile(q);
+						const list = files.slice(0, 10).map((f, i) => `${i + 1}. ${f.name}\n   🔗 ${f.url}`).join('\n\n');
+						await m.reply(`📁 *Hasil sfile: "${q}"*\n\n${list}`);
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
+					}
+				}
+				break;
+
+			case 'ytsearch':
+			case 'yts':
+				{
+					const q = (query || '').trim();
+					if (!q) {
+						await m.reply('Cari video YouTube. Contoh: `.ytsearch kucing lucu`');
+						break;
+					}
+					await m.reply('🔍 Mencari di YouTube...');
+					try {
+						const { searchYoutube, fmtDur } = await import('../helper/iyansearch.js');
+						const vids = await searchYoutube(q, 5);
+						const list = vids.map((v, i) => `${i + 1}. *${v.title}*\n   👤 ${v.uploader} | ⏱️ ${fmtDur(v.duration)}\n   🔗 ${v.url}`).join('\n\n');
+						await m.reply(`🎬 *Hasil YouTube: "${q}"*\n\n${list}\n\n_Download: .play <judul>_`);
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mencari.'));
+					}
+				}
+				break;
+
 			case 'play':
 				{
 					const q = (query || '').trim();
@@ -653,6 +692,8 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`💭 _"${quote}_"\n\n` +
 						`┏━ 📥 *DOWNLOADER*\n` +
 						`┣ 🎵 \`.play\` — audio YT\n` +
+						`┣ 🔍 \`.ytsearch\` — cari YT\n` +
+						`┣ 📁 \`.sfile\` — cari file\n` +
 						`┣ 🎬 \`.tt\` — TikTok HD + foto\n` +
 						`┣ 🎬 \`.tiktokv2\` — TikTok alt\n` +
 						`┣ 📌 \`.pin\` — Pinterest\n` +
