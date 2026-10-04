@@ -690,32 +690,52 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					const menuCaption =
 						`👋 Halo, *${ownerName}*! Selamat datang di *adawong* 🤖\n` +
 						`💭 _"${quote}"_\n\n` +
-						`📥 *DOWNLOADER*\n` +
-						`.play • .ytsearch • .sfile • .tt • .tiktokv2\n` +
-						`.pin • .ppcouple • .cosplay • .pixiv • .hentai\n\n` +
-						`🔞 *18+ ZONE*\n` +
-						`.cewe • .cewekat • .cewevid • .chara • .hanime\n` +
-						`.bokep • .cosplay18 • .nekopoi • .manhwa • .manhua\n\n` +
-						`🎨 *STIKER*\n` +
-						`.s • .spack • .tpack\n\n` +
-						`👁️ *STATUS*\n` +
-						`.sw • .swread • .swreact • .swreply\n` +
-						`.swreacttext • .swemoji • .uptimebio\n\n` +
-						`😂 *FUN*\n` +
-						`.khodam • .alay • .hacker\n\n` +
+						`┏━ 📥 *DOWNLOADER*\n` +
+						`┃ ✦ .play • .ytsearch • .sfile\n` +
+						`┃ ✦ .tt • .tiktokv2 • .pin\n` +
+						`┃ ✦ .ppcouple • .cosplay • .pixiv\n` +
+						`┗ ✦ .hentai\n\n` +
+						`┏━ 🔞 *18+ ZONE*\n` +
+						`┃ ✦ .cewe • .cewekat • .cewevid\n` +
+						`┃ ✦ .chara • .hanime • .bokep\n` +
+						`┃ ✦ .cosplay18 • .nekopoi\n` +
+						`┗ ✦ .manhwa • .manhua\n\n` +
+						`┏━ 🎨 *STIKER* ━━✦\n` +
+						`┗ ✦ .s • .spack • .tpack\n\n` +
+						`┏━ 👁️ *STATUS*\n` +
+						`┃ ✦ .sw • .swread • .swreact\n` +
+						`┃ ✦ .swreply • .swreacttext\n` +
+						`┗ ✦ .swemoji • .uptimebio\n\n` +
+						`┏━ 😂 *FUN* ━━✦\n` +
+						`┗ ✦ .khodam • .alay • .hacker\n\n` +
 						(gcLink ? `👥 *GRUP WA*\n🔗 ${gcLink}\n\n` : '') +
 						`👑 *${ownerName}* • ⚙️ readsw`;
+					// Banner via URL (GitHub raw) — lebih ringan, tanpa baca file lokal.
+					// Fallback ke file lokal kalau URL gagal.
+					const BANNER_URL = 'https://raw.githubusercontent.com/iyannsysu/iyan-x-m/main/assets/menu-adawong.jpg';
+					const sendMenu = async (useCaption) => {
+						const payload = useCaption
+							? { image: { url: BANNER_URL }, caption: menuCaption }
+							: { image: { url: BANNER_URL } };
+						try {
+							await hisoka.sendMessage(m.from, payload, { quoted: m });
+						} catch {
+							const banner = fs.readFileSync(MENU_BANNER);
+							await hisoka.sendMessage(m.from,
+								useCaption ? { image: banner, caption: menuCaption } : { image: banner },
+								{ quoted: m });
+						}
+					};
 					try {
-						const banner = fs.readFileSync(MENU_BANNER);
 						if (Buffer.byteLength(menuCaption, 'utf8') > 1000) {
 							// kepanjangan -> kirim gambar + teks terpisah
-							await hisoka.sendMessage(m.from, { image: banner }, { quoted: m });
+							await sendMenu(false);
 							await m.reply(menuCaption);
 						} else {
-							await hisoka.sendMessage(m.from, { image: banner, caption: menuCaption }, { quoted: m });
+							await sendMenu(true);
 						}
 					} catch {
-						// banner gagal -> kirim teks saja
+						// banner gagal total -> kirim teks saja
 						await m.reply(menuCaption);
 					}
 				}
