@@ -632,6 +632,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┣ 🎵 \`.play\` — audio YT\n` +
 						`┣ 🎬 \`.tt\` — TikTok HD + foto\n` +
 						`┣ 📌 \`.pin\` — Pinterest\n` +
+						`┣ 👘 \`.cosplay\` — cosplaytele\n` +
 						`┣ 🎨 \`.pixiv\` — Pixiv\n` +
 						`┗ 🔞 \`.hentai\` — galeri\n\n` +
 						`┏━ 🔞 *18+ ZONE*\n` +
@@ -770,6 +771,60 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mengambil dari Pinterest.'));
 					} finally {
 						if (tmpDir) cleanupPinterest(tmpDir);
+					}
+				}
+				break;
+
+			case 'cosplay':
+				{
+					const raw = (query || '').trim();
+					if (!raw) {
+						await m.reply(
+							'╭─「 👘 *COSPLAYTELE SEARCH* 」\n' +
+							'│\n' +
+							'│ Cari foto cosplay dari\n' +
+							'│ _cosplaytele.com_ secara realtime.\n' +
+							'│\n' +
+							'│ *Format:*\n' +
+							'│ • `.cosplay <keyword>`\n' +
+							'│ • `.cosplay random`\n' +
+							'│\n' +
+							'│ *Contoh:*\n' +
+							'│ 1. `.cosplay mitsuri`\n' +
+							'│ 2. `.cosplay rem re:zero`\n' +
+							'│ 3. `.cosplay velma`\n' +
+							'│ 4. `.cosplay random`\n' +
+							'│\n' +
+							'│ > ℹ️ Hasil dikirim sebagai *album foto.*\n' +
+							'╰──────────────────────'
+						);
+						break;
+					}
+					await m.reply('🔍 Cari cosplay...');
+					try {
+						const { searchCosplay, getPostPhotos, getLatestPosts, downloadPhotos } = await import('../helper/cosplay.js');
+						let post;
+						if (/^random$/i.test(raw)) {
+							const latest = await getLatestPosts(20);
+							if (!latest.length) { await m.reply('❌ Gagal ambil daftar postingan.'); break; }
+							post = latest[Math.floor(Math.random() * latest.length)];
+						} else {
+							const results = await searchCosplay(raw, 5);
+							if (!results.length) { await m.reply(`❌ Tidak ketemu hasil untuk "${raw}". Coba keyword lain.`); break; }
+							post = results[0];
+						}
+						const photoUrls = await getPostPhotos(post.url, 8);
+						if (!photoUrls.length) { await m.reply('❌ Tidak ada foto di postingan ini.'); break; }
+						const tmpDir = `/tmp/cosplay_${Date.now()}`;
+						const files = await downloadPhotos(photoUrls, tmpDir);
+						if (!files.length) { await m.reply('❌ Gagal download foto.'); break; }
+						const caption = `👘 *${post.title}*\n🔗 ${post.url}\n📸 ${files.length} foto`;
+						await sendAlbum(hisoka, m.from, files);
+						await m.reply(caption);
+						try { (await import('fs')).rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+					} catch (err) {
+						console.error('\x1b[31m[cosplay] error:\x1b[39m', err?.message || err);
+						await m.reply('❌ Gagal ambil cosplay. Coba lagi nanti.');
 					}
 				}
 				break;
@@ -1593,8 +1648,13 @@ export default async function ({ message, type: messagesType }, hisoka) {
 							const h = Math.floor(s / 3600);
 							const mnt = Math.floor((s % 3600) / 60);
 							const up = h > 0 ? `${h}j ${mnt}m` : `${mnt}m`;
-							await hisoka.updateProfileStatus(`🟢 Iyan x m • Online ⏱️ ${up}`);
-						} catch {}
+							const bio = `🟢 Iyan x m • Online ⏱️ ${up}`;
+							await hisoka.updateProfileStatus(bio);
+							console.log(`\x1b[36m[uptimebio] Bio diupdate via command: ${bio}\x1b[39m`);
+						} catch (err) {
+							console.error('\x1b[31m[uptimebio] Gagal via command:\x1b[39m', err?.message || err);
+							await m.reply(`⚠️ Gagal update bio: ${err?.message || err}`);
+						}
 					}
 					await m.reply(`⏱️ Bio uptime sekarang *${val ? 'ON ✅' : 'OFF ❌'}*`);
 				}
