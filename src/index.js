@@ -237,7 +237,7 @@ async function main() {
 					}
 				};
 				uptimeBioTick();
-				hisoka._uptimeBioTimer = setInterval(uptimeBioTick, 10 * 60 * 1000);
+				hisoka._uptimeBioTimer = setInterval(uptimeBioTick, 60 * 1000);
 			}
 
 			// fetch all groups for caching
