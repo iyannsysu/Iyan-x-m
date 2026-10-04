@@ -126,4 +126,12 @@ Join grup WhatsApp kami untuk tanya-tanya & update terbaru:
 
 ---
 
+## 📞 Kontak Owner
+
+Ada kendala atau mau request fitur? Hubungi langsung:
+
+👉 [Chat WhatsApp Iyan](https://wa.me/6282161429908)
+
+---
+
 Made with ❤️ by Iyan
