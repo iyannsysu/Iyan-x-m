@@ -633,6 +633,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`┣ 🎵 \`.play\` — audio YT\n` +
 						`┣ 🎬 \`.tt\` — TikTok HD + foto\n` +
 						`┣ 📌 \`.pin\` — Pinterest\n` +
+						`┣ 💑 \`.ppcouple\` — pp couple\n` +
 						`┣ 👘 \`.cosplay\` — cosplaytele\n` +
 						`┣ 🎨 \`.pixiv\` — Pixiv\n` +
 						`┗ 🔞 \`.hentai\` — galeri\n\n` +
@@ -828,6 +829,43 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					} catch (err) {
 						console.error('\x1b[31m[cosplay] error:\x1b[39m', err?.message || err);
 						await m.reply('❌ Gagal ambil cosplay. Coba lagi nanti.');
+					}
+				}
+				break;
+
+			case 'ppcouple':
+			case 'ppc':
+				{
+					const raw = (query || '').trim();
+					const theme = raw || 'anime';
+					await m.reply(`💑 Cari pp couple *${theme}*...`);
+					try {
+						const { searchPinterest, cleanupPinterest } = await import('../helper/pinterest.js');
+						// ambil 4 biar bisa pilih 2 yang paling cocok
+						const res = await searchPinterest(`pp couple ${theme}`, 4);
+						const files = res.files.slice(0, 2);
+						if (!files.length) {
+							await m.reply('❌ Tidak ketemu. Coba tema lain.');
+							cleanupPinterest(res.tmpDir);
+							break;
+						}
+						await hisoka.sendMessage(
+							m.from,
+							{ image: fs.readFileSync(files[0]), caption: `💑 PP Couple *${theme}*\n1️⃣ Untuk kamu` },
+							{ quoted: m }
+						);
+						if (files[1]) {
+							await hisoka.sendMessage(
+								m.from,
+								{ image: fs.readFileSync(files[1]), caption: `2️⃣ Untuk pasangan` }
+							);
+						}
+						if (files.length > 2 || res.files.length > 2) {
+							await m.reply(`_Mau yang lain? Ketik \`.ppcouple ${theme}\` lagi untuk acak baru_`);
+						}
+						cleanupPinterest(res.tmpDir);
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mencari pp couple.'));
 					}
 				}
 				break;
