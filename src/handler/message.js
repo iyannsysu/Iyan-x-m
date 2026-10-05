@@ -20,6 +20,8 @@ import { searchHanime, getHanimeStreams, pickHanimeStream, downloadHanimeStream,
 import { getStickerPack, downloadStickerPack, cleanupStickerPack } from '../helper/stickerpack.js';
 import { getTelegramPack, downloadTelegramPack, cleanupTelegramPack } from '../helper/tgsticker.js';
 import { readSwConfig, writeSwConfig, extractEmojis } from '../helper/swconfig.js';
+import { loadStoryCfg, saveStoryCfg, downloadTikTokHD, postToStatus } from '../helper/schedstory.js';
+import { handleBusyReply, loadBusyCfg, saveBusyCfg } from '../helper/busyreply.js';
 import { telegram } from '../helper/index.js';
 
 const execFileAsync = util.promisify(execFile);
@@ -57,14 +59,15 @@ async function handleTikTokDownload(hisoka, m, text) {
 		return;
 	}
 
-	await m.reply('⏳ Mengambil TikTok...');
+	const { startLoading } = await import('../helper/loading.js');
+	const ttLoad = await startLoading(hisoka, m, 'Mengambil TikTok');
 
 	const { getTikTok, downloadUrl, downloadTikTok: ytFallback } = await import('../helper/tiktok.js');
 	let info = null;
 	try {
 		info = await getTikTok(match[0]);
 	} catch (err) {
-		await m.reply('❌ ' + (err?.message || 'Gagal.') + '\n_Coba lagi sebentar..._');
+		await ttLoad.fail('❌ ' + (err?.message || 'Gagal.') + '\n_Coba lagi sebentar..._');
 		return;
 	}
 
@@ -72,7 +75,7 @@ async function handleTikTokDownload(hisoka, m, text) {
 
 	// FOTO SLIDESHOW -> kirim sebagai album
 	if (info.type === 'images') {
-		await m.reply(`🖼️ ${info.count} foto ditemukan, mengunduh...`);
+		await ttLoad.stop();
 		try {
 			const bufs = await Promise.all(info.images.map(u => downloadUrl(u, 20)));
 			const tmpFiles = bufs.map((b, i) => {
@@ -85,13 +88,13 @@ async function handleTikTokDownload(hisoka, m, text) {
 			await m.reply(caption);
 			for (const f of tmpFiles) { try { fs.unlinkSync(f); } catch {} }
 		} catch (err) {
-			await m.reply('❌ ' + (err?.message || 'Gagal mengunduh foto.'));
+			await ttLoad.fail('❌ ' + (err?.message || 'Gagal mengunduh foto.'));
 		}
 		return;
 	}
 
 	// VIDEO HD
-	await m.reply('🎬 Mengunduh video HD...');
+	await ttLoad.stop();
 	try {
 		const data = await downloadUrl(info.videoUrl, 100);
 		if (data.length > 100 * 1024 * 1024) {
@@ -116,7 +119,7 @@ async function handleTikTokDownload(hisoka, m, text) {
 			cleanupTikTok(file);
 		} catch (err2) {
 			if (file) { try { fs.unlinkSync(file); } catch {} }
-			await m.reply('❌ ' + (err2?.message || 'Gagal mengunduh video.'));
+			await ttLoad.fail('❌ ' + (err2?.message || 'Gagal mengunduh video.'));
 		}
 	}
 }
@@ -271,6 +274,9 @@ export default async function ({ message, type: messagesType }, hisoka) {
 			}
 		}
 
+		// Auto-reply sibuk berjenjang (1x pesan sibuk, 2-3x quotes, 4x+ diam)
+		await handleBusyReply(m);
+
 		// Anti view-once: teruskan foto/video sekali-lihat ke owner agar bisa dibuka ulang
 		{
 			const raw = message.message || {};
@@ -343,8 +349,15 @@ export default async function ({ message, type: messagesType }, hisoka) {
 			}
 		}
 
-		// Allow command only for me
-		if (!m.isOwner) return;
+		// Command access: owner selalu boleh.
+		// Non-owner: hanya jika public mode aktif DAN command ada di whitelist.
+		// (Untuk versi monolitik: whitelist check sederhana, tanpa rate limit canggih)
+		if (!m.isOwner) {
+			try {
+				const { isPublicModeEnabled, isPublicCommand } = await import('../helper/publicmode.js');
+				if (!isPublicModeEnabled() || !isPublicCommand(m.command)) return;
+			} catch { return; }
+		}
 
 		// Auto-detect link TikTok dari owner (tanpa command)
 		if (!m.command && /tiktok\.com/i.test(m.text || '')) {
@@ -591,7 +604,8 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						break;
 					}
 
-					await m.reply(`🔎 Mencari *${q}* ...`);
+					const { startLoading: slPlay } = await import('../helper/loading.js');
+					const playLoad = await slPlay(hisoka, m, 'Mencari lagu');
 
 					let res = null;
 					try {
@@ -601,7 +615,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						const secs = String(Math.floor(res.duration % 60)).padStart(2, '0');
 						const safeTitle = res.title.replace(/[\\/:*?"<>|]/g, '').slice(0, 80) || 'audio';
 
-						await m.reply(`🎵 *${res.title}*\n⏱️ Durasi: ${mins}:${secs}\n⬆️ Mengirim audio...`);
+						await playLoad.stop();
 
 						const content =
 							data.length > 100 * 1024 * 1024
@@ -609,9 +623,13 @@ export default async function ({ message, type: messagesType }, hisoka) {
 								: { audio: data, mimetype: 'audio/mpeg', fileName: `${safeTitle}.mp3` };
 						await hisoka.sendMessage(m.from, content, { quoted: m });
 					} catch (err) {
-						await m.reply('❌ ' + (err?.message || 'Gagal mengunduh audio.'));
+						const emsg = err?.message || 'Gagal mengunduh audio.';
+						const friendly = /Semua client gagal|not a bot|Sign in/i.test(emsg)
+							? '❌ YouTube lagi nge-block server bot 😅\nCoba lagi 5-10 menit lagi ya.'
+							: '❌ ' + emsg;
+						await playLoad.fail(friendly);
 					} finally {
-						if (res) cleanupYouTubeAudio(res.file);
+						if (res && !res.cached) cleanupYouTubeAudio(res.file);
 					}
 				}
 				break;
@@ -705,12 +723,16 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					];
 					const quote = quotes[Math.floor(Math.random() * quotes.length)];
 					const gcLink = readGcLink();
+					const _up = Math.floor(process.uptime());
+					const _uh = Math.floor(_up / 3600), _um = Math.floor((_up % 3600) / 60);
+					const uptimeStr = _uh > 0 ? `${_uh}j ${_um}m` : `${_um}m`;
 
 					// Menu compact untuk caption foto (limit WA 1024 byte!) —
 					// foto + menu jadi SATU pesan seperti kartu.
 					// Guard byte-length: kalau jebol, kirim terpisah (anti-hang).
 					const menuCaption =
 						`👋 *${ownerName}* — *adawong* 🤖\n` +
+						`⏱️ _Online ${uptimeStr}_\n` +
 						`💭 _"${quote}"_\n\n` +
 						`📥 *DOWNLOADER*\n` +
 						`├ .play\n` +
@@ -2232,6 +2254,150 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						}
 					}
 					await m.reply(`⏱️ Bio uptime sekarang *${val ? 'ON ✅' : 'OFF ❌'}*`);
+				}
+				break;
+
+			case 'storyadd':
+				{
+					const raw = (query || '').trim();
+					if (!raw || !/tiktok\.com/i.test(raw)) {
+						await m.reply('Kirim link TikTok-nya. Contoh: .storyadd https://www.tiktok.com/@user/video/123');
+						break;
+					}
+					const cfg = loadStoryCfg();
+					if (cfg.queue.some(q => q.url === raw)) {
+						await m.reply('Link itu udah ada di antrian.');
+						break;
+					}
+					cfg.queue.push({ url: raw, addedAt: new Date().toISOString() });
+					saveStoryCfg(cfg);
+					await m.reply(`✅ Ditambahkan ke antrian story (no. ${cfg.queue.length}).\nTotal antrian: ${cfg.queue.length} video.`);
+				}
+				break;
+
+			case 'storylist':
+				{
+					const cfg = loadStoryCfg();
+					const lines = cfg.queue.map((q, i) => `${i + 1}. ${q.url}`).join('\n') || '(kosong)';
+					await m.reply(
+						`📋 *JADWAL STORY*\n\n` +
+						`Status: ${cfg.enabled ? 'ON ✅' : 'OFF ❌'}\n` +
+						`Jam (WIB): ${cfg.times.join(', ') || '-'}\n` +
+						`Caption: ${cfg.caption || '(judul video)'}\n` +
+						(cfg.lastError ? `⚠️ Error terakhir: ${cfg.lastError}\n` : '') +
+						`\n🎬 *Antrian (${cfg.queue.length}):*\n${lines}`
+					);
+				}
+				break;
+
+			case 'storydel':
+				{
+					const n = parseInt((query || '').trim(), 10);
+					const cfg = loadStoryCfg();
+					if (!n || n < 1 || n > cfg.queue.length) {
+						await m.reply(`Nomornya 1-${cfg.queue.length}. Contoh: .storydel 2`);
+						break;
+					}
+					const [rm] = cfg.queue.splice(n - 1, 1);
+					if (cfg.index >= cfg.queue.length) cfg.index = 0;
+					saveStoryCfg(cfg);
+					await m.reply(`🗑️ Dihapus dari antrian:\n${rm.url}`);
+					}
+				break;
+
+			case 'storyclear':
+				{
+					const cfg = loadStoryCfg();
+					cfg.queue = []; cfg.index = 0;
+					saveStoryCfg(cfg);
+					await m.reply('🗑️ Antrian story dikosongkan.');
+				}
+				break;
+
+			case 'storytime':
+				{
+					const raw = (query || '').trim();
+					if (!raw) {
+						await m.reply('Contoh: .storytime 07:00,12:00,18:00');
+						break;
+					}
+					const times = raw.split(/[\s,]+/).filter(t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t));
+					if (!times.length) {
+						await m.reply('Format jam salah. Contoh: .storytime 07:00,12:00,18:00');
+						break;
+					}
+					const cfg = loadStoryCfg();
+					cfg.times = [...new Set(times)].sort();
+					saveStoryCfg(cfg);
+					await m.reply(`⏰ Jadwal story: ${cfg.times.join(', ')} WIB`);
+				}
+				break;
+
+			case 'storyon':
+			case 'storyoff':
+				{
+					const cfg = loadStoryCfg();
+					cfg.enabled = m.command === 'storyon';
+					saveStoryCfg(cfg);
+					await m.reply(cfg.enabled
+						? `✅ Auto-posting story *ON*.\nJadwal: ${cfg.times.join(', ')} WIB\nAntrian: ${cfg.queue.length} video.`
+						: '❌ Auto-posting story *OFF*.');
+				}
+				break;
+
+			case 'storycap':
+				{
+					const cfg = loadStoryCfg();
+					cfg.caption = (query || '').trim();
+					saveStoryCfg(cfg);
+					await m.reply(cfg.caption ? `✏️ Caption story: "${cfg.caption}"` : '✏️ Caption dikosongkan (pakai judul video).');
+				}
+				break;
+
+			case 'storynow':
+				{
+					const cfg = loadStoryCfg();
+					if (!cfg.queue.length) {
+						await m.reply('Antrian kosong. Tambah dulu: .storyadd <link tiktok>');
+						break;
+					}
+					const item = cfg.queue[cfg.index % cfg.queue.length];
+					const { startLoading: slStory } = await import('../helper/loading.js');
+					const storyLoad = await slStory(hisoka, m, 'Posting story');
+					try {
+						const dl = await downloadTikTokHD(item.url);
+						const caption = cfg.caption || `🎬 ${dl.title}\n👤 @${dl.uploader}`;
+						await postToStatus(hisoka, dl.file, caption);
+						cfg.index = (cfg.index + 1) % cfg.queue.length;
+						saveStoryCfg(cfg);
+						await storyLoad.done('✅ Story terkirim!');
+						try { fs.unlinkSync(dl.file); } catch {}
+					} catch (e) {
+						await storyLoad.fail('❌ Gagal: ' + (e?.message || e));
+					}
+				}
+				break;
+
+			case 'busyreply':
+				{
+					const v = (query || '').trim().toLowerCase();
+					const cfg = loadBusyCfg();
+					if (v === 'stat') {
+						const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+						const rows = Object.entries(cfg.counts)
+							.filter(([, e]) => e.date === today)
+							.map(([jid, e]) => `• ${jid.split('@')[0]}: ${e.count}x`);
+						await m.reply(`📊 *BUSY-REPLY* (${cfg.enabled ? 'ON ✅' : 'OFF ❌'})\nHari ini:\n${rows.join('\n') || '(belum ada chat)'}`);
+						break;
+					}
+					const val = ['on','1','nyala','ya'].includes(v) ? true : ['off','0','mati','tidak'].includes(v) ? false : null;
+					if (val === null) {
+						await m.reply('Pakai: .busyreply on / off / stat');
+						break;
+					}
+					cfg.enabled = val;
+					saveBusyCfg(cfg);
+					await m.reply(`Busy-reply sekarang *${val ? 'ON ✅' : 'OFF ❌'}*`);
 				}
 				break;
 
