@@ -231,7 +231,8 @@ async function main() {
 						const h = Math.floor(s / 3600);
 						const mnt = Math.floor((s % 3600) / 60);
 						const up = h > 0 ? `${h}j ${mnt}m` : `${mnt}m`;
-						await hisoka.updateProfileStatus(`🟢 Iyan x m • Online ⏱️ ${up}`);
+						const bio = `🟢 Iyan x m • Online ⏱️ ${up}`;
+						await hisoka.updateProfileStatus(bio);
 					} catch (err) {
 						console.error('\x1b[31mGagal update bio uptime:\x1b[39m', err?.message || err);
 					}
