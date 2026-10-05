@@ -352,6 +352,28 @@ export default async function ({ message, type: messagesType }, hisoka) {
 			return;
 		}
 
+		// GAME: cek jawaban jika ada sesi aktif dan bukan command
+		if (m.isOwner && !m.command && m.text) {
+			try {
+				const { checkAnswer, getSession } = await import('../helper/games.js');
+				const result = checkAnswer(m.from, m.text);
+				if (result?.correct) {
+					await m.reply(`🎉 *Benar!*\nJawaban: *${result.jawaban}*`);
+					return;
+				}
+			} catch {}
+		}
+
+		// AFK: hapus status saat owner kirim pesan (kecuali command .afk itu sendiri)
+		if (m.isOwner && m.command !== 'afk') {
+			try {
+				const { clearAfk } = await import('../helper/menfess.js');
+				if (clearAfk(m.sender)) {
+					await m.reply('✅ Kamu kembali dari AFK!');
+				}
+			} catch {}
+		}
+
 		switch (m.command) {
 			case 'hidetag':
 			case 'ht':
@@ -688,7 +710,7 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					// foto + menu jadi SATU pesan seperti kartu.
 					// Guard byte-length: kalau jebol, kirim terpisah (anti-hang).
 					const menuCaption =
-						`👋 Halo *${ownerName}*, selamat datang di *adawong* 🤖\n` +
+						`👋 *${ownerName}* — *adawong* 🤖\n` +
 						`💭 _"${quote}"_\n\n` +
 						`📥 *DOWNLOADER*\n` +
 						`├ .play\n` +
@@ -727,7 +749,33 @@ export default async function ({ message, type: messagesType }, hisoka) {
 						`😂 *FUN*\n` +
 						`├ .khodam\n` +
 						`├ .alay\n` +
-						`└ .hacker\n\n` +
+						`├ .hacker\n` +
+						`├ .menfess\n` +
+						`└ .afk\n\n` +
+						`🎮 *GAME*\n` +
+						`├ .tebakgambar\n` +
+						`├ .tebakkata\n` +
+						`├ .tebakbendera\n` +
+						`├ .susunkata\n` +
+						`├ .tekateki\n` +
+						`├ .asahotak\n` +
+						`├ .caklontong\n` +
+						`├ .family100\n` +
+						`├ .siapakahaku\n` +
+						`├ .tebakkalimat\n` +
+						`├ .math\n` +
+						`└ .nyerah\n\n` +
+						`🔧 *TOOLS*\n` +
+						`├ .tts\n` +
+						`├ .translate\n` +
+						`├ .ssweb\n` +
+						`└ .cuaca\n\n` +
+						`🕌 *ISLAMI & PRIMBON*\n` +
+						`├ .jadwalsholat\n` +
+						`├ .doaharian\n` +
+						`├ .artinama\n` +
+						`├ .ramalanjodoh\n` +
+						`└ .zodiak\n\n` +
 						(gcLink ? `👥 *GRUP WA*\n🔗 ${gcLink}\n\n` : '') +
 						`👑 *${ownerName}* • ⚙️ readsw`;
 					// Banner via URL (GitHub raw) — lebih ringan, tanpa baca file lokal.
@@ -1291,6 +1339,318 @@ export default async function ({ message, type: messagesType }, hisoka) {
 					} catch (err) {
 						await m.reply('❌ ' + (err?.message || 'Gagal mencari video.'));
 					}
+				}
+				break;
+
+			// ===== MENFESS & AFK (port dari Furina MD) =====
+			case 'menfess':
+			case 'confess':
+				{
+					const { getMenfess, saveMenfess, findMenfessSession } = await import('../helper/menfess.js');
+					const menfess = getMenfess();
+					const senderJid = m.sender;
+					// Kalau lagi dalam sesi chatting, teruskan pesan
+					const active = Object.values(menfess).find(s => s.state === 'CHATTING' && (s.a === senderJid || s.b === senderJid));
+					if (active) {
+						const target = active.a === senderJid ? active.b : active.a;
+						const senderNum = senderJid.split('@')[0];
+						await hisoka.sendMessage(target, { text: `📩 Pesan menfess:\n\n${query || m.text}`, mentions: [senderJid] });
+						await m.reply('Pesan diteruskan.');
+						break;
+					}
+					const existing = findMenfessSession(menfess, senderJid);
+					if (existing) {
+						await m.reply('Kamu masih dalam sesi menfess. Ketik `.stopmenfess` untuk keluar.');
+						break;
+					}
+					const parts = (query || '').split('|').map(s => s.trim());
+					if (parts.length < 3) {
+						await m.reply('Format: `.menfess nama|nomor|pesan`\nContoh: `.menfess Anonim|62812xxxx|Halo, aku suka kamu`');
+						break;
+					}
+					let [nama, nomor, ...pesanParts] = parts;
+					const pesan = pesanParts.join('|');
+					nomor = nomor.replace(/^0/, '62').replace(/[^0-9]/g, '');
+					if (!nomor || nomor.length < 9) {
+						await m.reply('Nomor tidak valid.');
+						break;
+					}
+					const targetJid = `${nomor}@s.whatsapp.net`;
+					const id = senderJid;
+					menfess[id] = { id, a: senderJid, b: targetJid, state: 'WAITING', nama };
+					saveMenfess(menfess);
+					await hisoka.sendMessage(targetJid, {
+						text: `💌 *Ada menfess buat kamu!*\n\nDari: ${nama}\nPesan: ${pesan}\n\nKetik:\n.balasmenfess — terima & balas\n.tolakmenfess — tolak`
+					});
+					await m.reply('Menfess terkirim! Semoga dibalas ya 💌');
+				}
+				break;
+
+			case 'balasmenfess':
+				{
+					const { getMenfess, saveMenfess } = await import('../helper/menfess.js');
+					const menfess = getMenfess();
+					const room = Object.values(menfess).find(s => (s.a === m.sender || s.b === m.sender) && s.state === 'WAITING');
+					if (!room) { await m.reply('Tidak ada menfess menunggu.'); break; }
+					room.state = 'CHATTING';
+					// Pastikan b = yang menerima
+					if (room.a !== m.sender && room.b !== m.sender) { await m.reply('Sesi tidak valid.'); break; }
+					saveMenfess(menfess);
+					const other = room.a === m.sender ? room.b : room.a;
+					await hisoka.sendMessage(other, { text: '💌 Menfess diterima! Kalian sekarang bisa chat via `.menfess <pesan>`.' });
+					await m.reply('Menfess diterima! Ketik `.menfess <pesan>` untuk chat.');
+				}
+				break;
+
+			case 'tolakmenfess':
+			case 'stopmenfess':
+				{
+					const { getMenfess, saveMenfess, findMenfessSession } = await import('../helper/menfess.js');
+					const menfess = getMenfess();
+					const sess = findMenfessSession(menfess, m.sender);
+					if (!sess) { await m.reply('Tidak ada sesi menfess.'); break; }
+					const other = sess.a === m.sender ? sess.b : sess.a;
+					delete menfess[sess.id];
+					saveMenfess(menfess);
+					try { await hisoka.sendMessage(other, { text: '💔 Sesi menfess diakhiri.' }); } catch {}
+					await m.reply('Sesi menfess diakhiri.');
+				}
+				break;
+
+			case 'afk':
+				{
+					const { setAfk } = await import('../helper/menfess.js');
+					const reason = (query || '').trim() || '-';
+					setAfk(m.sender, reason);
+					await m.reply(`✅ *Kamu AFK!*\n\n💤 Alasan: ${reason}\n\nStatus hilang otomatis saat kamu kirim pesan lagi.`);
+				}
+				break;
+
+			// ===== GAME TEBAK-TEBAKAN (port dari Furina MD) =====
+			case 'tebakgambar':
+			case 'tebakkata':
+			case 'tebakbendera':
+			case 'tebakbendera2':
+			case 'susunkata':
+			case 'tekateki':
+			case 'asahotak':
+			case 'caklontong':
+			case 'family100':
+			case 'siapakahaku':
+			case 'siapaaku':
+			case 'tebakkimia':
+			case 'tebaklirik':
+			case 'tebakkalimat':
+				{
+					const { startGame, formatQuestion, hasSession } = await import('../helper/games.js');
+					const game = m.command;
+					if (hasSession(m.from)) {
+						await m.reply('Masih ada sesi game yang belum selesai!');
+						break;
+					}
+					await m.reply('🎮 Mengambil soal...');
+					try {
+						const { soal, type } = await startGame(m.from, game, (s) => {
+							hisoka.sendMessage(m.from, { text: `⏰ Waktu habis!\nJawaban: *${s.jawaban}*` }, { quoted: m }).catch(() => {});
+						});
+						const caption = formatQuestion(game, soal);
+						if (type === 'image' && soal.img) {
+							await hisoka.sendMessage(m.from, { image: { url: soal.img }, caption }, { quoted: m });
+						} else {
+							await m.reply(caption);
+						}
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal mulai game.'));
+					}
+				}
+				break;
+
+			case 'math':
+			case 'kuismath':
+				{
+					const modes = {
+						noob: [-10, 10, '+-', 15],
+						easy: [-20, 20, '*/+-', 20],
+						medium: [-50, 50, '*/+-', 40],
+						hard: [-100, 100, '*/+-', 60],
+					};
+					const mode = (query || '').trim().toLowerCase() || 'easy';
+					if (!modes[mode]) {
+						await m.reply('Pilih mode: noob, easy, medium, hard\nContoh: `.math medium`');
+						break;
+					}
+					const [min, max, ops, detik] = modes[mode];
+					const a = Math.floor(Math.random() * (max - min + 1)) + min;
+					const b = Math.floor(Math.random() * (max - min + 1)) + min;
+					const op = ops[Math.floor(Math.random() * ops.length)];
+					let jawaban = op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : Math.floor(a / b);
+					const { getSession } = await import('../helper/games.js');
+					if (getSession(m.from)) { await m.reply('Masih ada sesi game!'); break; }
+					// Daftarkan sesi custom
+					const gm = await import('../helper/games.js');
+					gm._registerMath(m.from, String(jawaban), detik * 1000, (jwb) => {
+						hisoka.sendMessage(m.from, { text: `⏰ Waktu habis!\nJawaban: *${jwb}*` }, { quoted: m }).catch(() => {});
+					});
+					await m.reply(`🔢 *MATH (${mode})*\n\nBerapa ${a} ${op} ${b} ?\n\n⏱️ ${detik} detik | Ketik jawaban langsung`);
+				}
+				break;
+
+			case 'nyerah':
+			case 'giveup':
+				{
+					const { getSession, clearSession } = await import('../helper/games.js');
+					const s = getSession(m.from);
+					if (!s) { await m.reply('Tidak ada sesi game aktif.'); break; }
+					clearSession(m.from);
+					await m.reply(`🏳️ Menyerah!\nJawaban: *${s.soal.jawaban}*`);
+				}
+				break;
+
+			// ===== ISLAMI (port dari Furina MD) =====
+			case 'jadwalsholat':
+			case 'sholat':
+				{
+					const { getJadwalSholat, formatJadwal } = await import('../helper/islami.js');
+					const kota = (query || '').trim() || 'Jakarta';
+					await m.reply('🕌 Mengambil jadwal sholat...');
+					try {
+						const j = await getJadwalSholat(kota);
+						await m.reply(formatJadwal(j));
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal.'));
+					}
+				}
+				break;
+
+			case 'doaharian':
+			case 'doa':
+				{
+					const { getDoaHarian, formatDoa, getDoaCount } = await import('../helper/islami.js');
+					try {
+						const q = (query || '').trim();
+						const total = getDoaCount();
+						let idx = null;
+						if (q && !isNaN(q)) {
+							idx = Math.max(0, Math.min(total - 1, parseInt(q) - 1));
+						}
+						const { doa, index } = getDoaHarian(idx);
+						await m.reply(formatDoa(doa, index, total) + `\n\n_Lihat doa lain: .doa <1-${total}>_`);
+					} catch (err) {
+						await m.reply('❌ ' + (err?.message || 'Gagal.'));
+					}
+				}
+				break;
+
+			// ===== PRIMBON (port dari Furina MD) =====
+			case 'artinama':
+				{
+					const { artiNama } = await import('../helper/primbon.js');
+					const nama = (query || '').trim();
+					if (!nama) { await m.reply('Contoh: `.artinama Budi Santoso`'); break; }
+					await m.reply('🔮 Menerawang nama...');
+					try {
+						const r = await artiNama(nama);
+						await m.reply(`• *Nama:* ${r.nama}\n• *Arti:* ${r.arti}\n• *Catatan:* ${r.catatan}`);
+					} catch (err) { await m.reply('❌ ' + (err?.message || 'Gagal.')); }
+				}
+				break;
+
+			case 'ramalanjodoh':
+			case 'jodoh':
+				{
+					const { ramalanJodoh } = await import('../helper/primbon.js');
+					const parts = (query || '').split('|').map(s => s.trim());
+					if (parts.length < 2) { await m.reply('Contoh: `.ramalanjodoh Budi|Siti`'); break; }
+					await m.reply('💕 Menerawang jodoh...');
+					try {
+						const r = await ramalanJodoh(parts[0], parts[1]);
+						await m.reply(`💕 *Ramalan Jodoh*\n\n• *${r.nama1}* & *${r.nama2}*\n• Kecocokan: ${r.kecocokan || r.persentase || '-'}\n${r.deskripsi ? `• ${r.deskripsi}` : ''}`);
+					} catch (err) { await m.reply('❌ ' + (err?.message || 'Gagal.')); }
+				}
+				break;
+
+			case 'zodiak':
+				{
+					const { getZodiak, zodiakInfo } = await import('../helper/primbon.js');
+					const q = (query || '').trim();
+					if (!q) { await m.reply('Contoh: `.zodiak 17 8` (tgl bln) atau `.zodiak leo`'); break; }
+					try {
+						const parts = q.split(/\s+/);
+						if (parts.length >= 2 && !isNaN(parts[0])) {
+							const z = getZodiak(parseInt(parts[0]), parseInt(parts[1]));
+							const info = await zodiakInfo(z).catch(() => null);
+							await m.reply(`⭐ *Zodiak:* ${z.toUpperCase()}\n${info ? `\n${info}` : ''}`);
+						} else {
+							const info = await zodiakInfo(parts[0].toLowerCase());
+							await m.reply(`⭐ *Zodiak ${parts[0].toUpperCase()}*\n\n${typeof info === 'string' ? info : JSON.stringify(info)}`);
+						}
+					} catch (err) { await m.reply('❌ ' + (err?.message || 'Gagal.')); }
+				}
+				break;
+
+			// ===== TTS & TRANSLATE (port dari Furina MD) =====
+			case 'tts':
+			case 'say':
+			case 'gtts':
+				{
+					const text = (query || '').trim();
+					if (!text) { await m.reply('Contoh: `.tts halo apa kabar`'); break; }
+					if (text.length > 200) { await m.reply('Teks maksimal 200 karakter.'); break; }
+					const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=id&client=tw-ob`;
+					await hisoka.sendMessage(m.from, { audio: { url }, mimetype: 'audio/mp4', ptt: true }, { quoted: m });
+				}
+				break;
+
+			case 'translate':
+			case 'tr':
+				{
+					const parts = (query || '').trim().split(/\s+/);
+					if (parts.length < 2) { await m.reply('Contoh: `.translate en halo apa kabar`\n(kode bahasa: en, id, ja, ko, ar, dll)'); break; }
+					const target = parts[0].toLowerCase();
+					const text = parts.slice(1).join(' ');
+					try {
+						const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(text)}`, {
+							headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000),
+						});
+						const j = await r.json();
+						const translated = j[0]?.map(x => x[0]).join('') || '-';
+						const detected = j[2] || 'auto';
+						await m.reply(`🌐 *Translate*\n\nDari (${detected}) → ${target}\n\n${translated}`);
+					} catch { await m.reply('❌ Gagal translate.'); }
+				}
+				break;
+
+			// ===== SS WEB & CUACA (port dari Furina MD) =====
+			case 'ssweb':
+			case 'ss':
+				{
+					const url = (query || '').trim();
+					if (!url) { await m.reply('Contoh: `.ssweb https://google.com`'); break; }
+					const full = url.startsWith('http') ? url : 'https://' + url;
+					await m.reply('📸 Mengambil screenshot...');
+					try {
+						const ssUrl = `https://image.thum.io/get/width/800/crop/600/${encodeURIComponent(full)}`;
+						await hisoka.sendMessage(m.from, { image: { url: ssUrl }, caption: `📸 ${full}` }, { quoted: m });
+					} catch { await m.reply('❌ Gagal screenshot.'); }
+				}
+				break;
+
+			case 'cuaca':
+				{
+					const kota = (query || '').trim() || 'Jakarta';
+					try {
+						const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(kota)},ID&units=metric&lang=id&appid=`, {
+							signal: AbortSignal.timeout(15000),
+						}).catch(() => null);
+						// Fallback: wttr.in (gratis, tanpa key)
+						const r2 = await fetch(`https://wttr.in/${encodeURIComponent(kota)}?format=j1`, {
+							headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15000),
+						});
+						if (!r2.ok) throw new Error('Gagal.');
+						const j = await r2.json();
+						const c = j.current_condition[0];
+						await m.reply(`🌤️ *Cuaca ${kota}*\n\n🌡️ Suhu: ${c.temp_C}°C (terasa ${c.FeelsLikeC}°C)\n💧 Kelembapan: ${c.humidity}%\n💨 Angin: ${c.windspeedKmph} km/h\n👁️ Jarak pandang: ${c.visibility} km\n📝 ${c.weatherDesc[0].value}`);
+					} catch { await m.reply('❌ Gagal ambil cuaca.'); }
 				}
 				break;
 
